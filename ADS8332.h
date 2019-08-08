@@ -28,6 +28,7 @@ class ADS8332
 			ChannelSelectMode = 11, //0 => manual, 1 => automatic, default => 1
 			ClockSource = 10, //0 => SPI SCLK, 1 => internal clock, default => 1
 			TriggerMode = 9, //0 => auto trigger, 1 => CONVST trigger, default => 1
+			SampleRate = 8, //0=> 500kSPS, 1=> 250kSPS, default => 1
 			EOCINTPolarity = 7, //0 => EOCINT active high, 1 => EOCINT active low, default 1
 			EOCINTMode = 6, //0 => pin used as INT, 1 => pin used as EOC, default 1
 			ChainMode = 5, //0 => use CDI input, 1 => use EOCINT, default 1
@@ -37,6 +38,21 @@ class ADS8332
 			TAG = 1, //0 => Tag disabled, 1=> tag enabled, default => 1
 			Reset = 0, //0 => reset, 1 => normal, default => 1
 		};
+		/*enum class ConfigRegisterMap : uint8_t
+		{
+			ChannelSelectMode = 0, //0 => manual, 1 => automatic, default => 1
+			ClockSource = 1, //0 => SPI SCLK, 1 => internal clock, default => 1
+			TriggerMode = 2, //0 => auto trigger, 1 => CONVST trigger, default => 1
+			SampleRate = 3, //0=> 500kSPS, 1=> 250kSPS, default => 1
+			EOCINTPolarity = 4, //0 => EOCINT active high, 1 => EOCINT active low, default 1
+			EOCINTMode = 5, //0 => pin used as INT, 1 => pin used as EOC, default 1
+			ChainMode = 6, //0 => use CDI input, 1 => use EOCINT, default 1
+			AutoNap = 7, //0 => Auto nap enabled, 1 => auto nap disabled, default 1
+			Nap = 8, //0 => Enable nap, 1 => wake up, default => 1
+			Sleep = 9, //0 => enable sleep, 1=> wake up, default => 1
+			TAG = 10, //0 => Tag disabled, 1=> tag enabled, default => 1
+			Reset = 11, //0 => reset, 1 => normal, default => 1
+		};*/
 		ADS8332(uint8_t SelectPin, uint8_t ConvertPin, uint8_t EOCPin);
 		void begin();
 		void reset();

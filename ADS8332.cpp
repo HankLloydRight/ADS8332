@@ -12,13 +12,13 @@ ADS8332::ADS8332(uint8_t _SelectPin, uint8_t _ConvertPin, uint8_t _EOCPin)
 	pinMode(EOCPin, INPUT);
 	Vref = 2.5;
 	EOCTimeout = 100000;
-	ConnectionSettings = SPISettings(10000000, MSBFIRST, SPI_MODE0);
+	ConnectionSettings = SPISettings(12000000, MSBFIRST, SPI_MODE1);
 }
 
 void ADS8332::setCommandBuffer(CommandRegister Command)
 {
 	CommandBuffer = 0;
-	CommandBuffer = static_cast<uint8_t>( Command ) << 12;
+	CommandBuffer = ((uint16_t)static_cast<uint8_t>( Command )) << 12;
 }
 
 void ADS8332::begin()
@@ -27,6 +27,7 @@ void ADS8332::begin()
 	setConfiguration(ConfigRegisterMap::ChannelSelectMode, false);
 	setConfiguration(ConfigRegisterMap::ClockSource, true);
 	setConfiguration(ConfigRegisterMap::TriggerMode, true);
+	setConfiguration(ConfigRegisterMap::SampleRate, true);
 	setConfiguration(ConfigRegisterMap::EOCINTPolarity, true);
 	setConfiguration(ConfigRegisterMap::EOCINTMode, true);
 	setConfiguration(ConfigRegisterMap::ChainMode, true);
@@ -35,7 +36,6 @@ void ADS8332::begin()
 	setConfiguration(ConfigRegisterMap::Sleep, true);
 	setConfiguration(ConfigRegisterMap::TAG, true);
 	setConfiguration(ConfigRegisterMap::Reset, true);
-	bitWrite(CommandBuffer, 8, true);
 	//Serial.println(CommandBuffer,BIN);
 	sendCommandBuffer(true);
 	//sendWriteCommandBuffer();
@@ -47,6 +47,7 @@ void ADS8332::reset()
 	setConfiguration(ConfigRegisterMap::ChannelSelectMode, false);
 	setConfiguration(ConfigRegisterMap::ClockSource, true);
 	setConfiguration(ConfigRegisterMap::TriggerMode, true);
+	setConfiguration(ConfigRegisterMap::SampleRate, true);
 	setConfiguration(ConfigRegisterMap::EOCINTPolarity, true);
 	setConfiguration(ConfigRegisterMap::EOCINTMode, true);
 	setConfiguration(ConfigRegisterMap::ChainMode, true);
@@ -55,7 +56,6 @@ void ADS8332::reset()
 	setConfiguration(ConfigRegisterMap::Sleep, true);
 	setConfiguration(ConfigRegisterMap::TAG, true);
 	setConfiguration(ConfigRegisterMap::Reset, false);
-	bitWrite(CommandBuffer, 8, true);
 	//Serial.println(CommandBuffer,BIN);
 	sendCommandBuffer(true);
 	//sendWriteCommandBuffer();
@@ -131,6 +131,11 @@ uint16_t ADS8332::sendCommandBuffer(bool SendLong)
 	}
 	digitalWrite(SelectPin, HIGH);
 	SPI.endTransaction();
+/*	Serial.print("O:");
+	Serial.print(TempOutput.UIntSmallData[1]);
+	Serial.print(":");
+	Serial.print(TempOutput.UIntSmallData[0]);
+	Serial.print(";\n");*/
 	return TempInput.UIntLargeData;
 }
 
@@ -252,9 +257,16 @@ uint8_t ADS8332::getSampleInteger(uint16_t* WriteVariable)
 		SPI.endTransaction();
 		ChannelTag = (uint8_t)(TAGData>>5);
 		ChannelCorrect = ( ChannelTag == Channel );
-		TagBlank = (uint8_t)(TAGData << 1) == (uint8_t)(0);
+		TagBlank = (uint8_t)(TAGData << 3) == (uint8_t)(0);
 		if (ChannelCorrect && TagBlank)
 		{
+			/*Serial.print("ADCS ");
+			Serial.print(ChannelTag);
+			Serial.print(",");
+			Serial.print(Channel);
+			Serial.print(",");
+			Serial.print(TempInput.UIntLargeData);
+			Serial.print("\n");*/
 			*WriteVariable = TempInput.UIntLargeData;
 			return 0;
 		}
@@ -263,18 +275,12 @@ uint8_t ADS8332::getSampleInteger(uint16_t* WriteVariable)
 			if ( (micros() - starttime) > EOCTimeout)
 			{
 				/*
-				Serial.print("E:");
-				Serial.print(TempInput.UIntSmallData[1],BIN);
+				Serial.print("ADCE ");
+				Serial.print(ChannelTag);
 				Serial.print(",");
-				Serial.print(TempInput.UIntSmallData[0],BIN);
+				Serial.print(Channel);
 				Serial.print(",");
-				Serial.print(TAGData,BIN);
-				Serial.print(",");
-				Serial.print(ChannelCorrect);
-				Serial.print(",");
-				Serial.print(TagBlank);
-				Serial.print(",");
-				Serial.print(UseChannel0);
+				Serial.print(TempInput.UIntLargeData);
 				Serial.print("\n");
 				*/
 				return 3;
