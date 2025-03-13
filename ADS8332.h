@@ -4,11 +4,12 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-class ADS8332
-{
+#include "esp32-hal-gpio.h"
+#include "driver/gpio.h"
+
+class ADS8332 {
 	public:
-		enum class CommandRegister : uint8_t
-		{
+		enum class CommandRegister : uint8_t {
 			SelectCh0 = 0,
 			SelectCh1 = 1,
 			SelectCh2 = 2,
@@ -23,8 +24,7 @@ class ADS8332
 			WriteConfig = 14,
 			DefaultConfig = 15,
 		};
-		enum class ConfigRegisterMap : uint8_t
-		{
+		enum class ConfigRegisterMap : uint8_t 	{
 			ChannelSelectMode = 11, //0 => manual, 1 => automatic, default => 1
 			ClockSource = 10, //0 => SPI SCLK, 1 => internal clock, default => 1
 			TriggerMode = 9, //0 => auto trigger, 1 => CONVST trigger, default => 1
@@ -56,30 +56,26 @@ class ADS8332
 		ADS8332(uint8_t SelectPin, uint8_t ConvertPin, uint8_t EOCPin);
 		void begin();
 		void reset();
-		uint8_t getSample(float* WriteVariable, uint8_t UseChannel);
-		uint8_t getSample(uint16_t* WriteVariable, uint8_t UseChannel);
+		uint16_t getSample(uint8_t UseChannel);
 		uint16_t getConfig();
 		void setVref(float NewVref);
 		float getVref();
 		SPISettings* GetSPISettings();
 	private:
-		float convertVrefRange(int16_t Value);
-		uint16_t sendManualSingle(uint8_t Channel);
 		void setCommandBuffer(CommandRegister Command);
 		void setConfiguration(ConfigRegisterMap Option, bool Setting);
-		uint16_t sendCommandBuffer(bool SendLong);
+		uint16_t sendCommandBuffer16();
+		uint8_t sendCommandBuffer8();
 		void print_binary(uint32_t v);
 		void setSampleChannel();
-		uint32_t bitBangData(uint32_t _send, uint8_t bitcount);
-		uint8_t getSampleInteger(uint16_t* WriteVariable);
+		uint16_t getSampleInteger();
 		uint8_t Channel = 0;
 		bool beginsent = false;
 		uint32_t EOCTimeout;
-		uint16_t CommandBuffer;
-		uint8_t SelectPin;
+		uint16_t CommandBuffer,CommandReply16,SampleReturn;
+		uint8_t SelectPin,CommandReply8;
 		uint8_t ConvertPin;
-		uint8_t EOCPin;
-		float Vref;
+		uint8_t EOCPin;		
 		SPISettings ConnectionSettings;
 };
 
