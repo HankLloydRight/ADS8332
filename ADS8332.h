@@ -7,6 +7,8 @@
 #include "esp32-hal-gpio.h"
 #include "driver/gpio.h"
 
+extern uint8_t spiRead3Bits();
+
 class ADS8332 {
 	public:
 		enum class CommandRegister : uint8_t {
@@ -55,8 +57,10 @@ class ADS8332 {
 		};*/
 		ADS8332(uint8_t SelectPin, uint8_t ConvertPin, uint8_t EOCPin);
 		void begin();
+		void beginauto();
 		void reset();
 		uint16_t getSample(uint8_t UseChannel);
+		uint16_t getSampleIntegerAndTag(uint32_t *tag) ;
 		uint16_t getConfig();
 		void setVref(float NewVref);
 		float getVref();
@@ -66,16 +70,17 @@ class ADS8332 {
 		void setConfiguration(ConfigRegisterMap Option, bool Setting);
 		uint16_t sendCommandBuffer16();
 		uint8_t sendCommandBuffer8();
+		void sendCommandBuffer4();
 		void print_binary(uint32_t v);
 		void setSampleChannel();
 		uint16_t getSampleInteger();
 		uint8_t Channel = 0;
 		bool beginsent = false;
-		uint32_t EOCTimeout;
-		uint16_t CommandBuffer,CommandReply16,SampleReturn;
-		uint8_t SelectPin,CommandReply8;
+		uint32_t EOCTimeout,CommandBuffer,SampleReturn32;
+		uint16_t CommandReply16,SampleReturn;
+		uint8_t SelectPin,CommandReply8,CommandBuffer4;
 		uint8_t ConvertPin;
-		uint8_t EOCPin;		
+		uint8_t EOCPin;
 		SPISettings ConnectionSettings;
 };
 
