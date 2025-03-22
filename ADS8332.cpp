@@ -1,4 +1,5 @@
 #include "ADS8332.h"
+#include "esp32-hal-spi.h"
 
 extern SPIClass * vspi; //uninitalised pointer to SPI object
 
@@ -16,7 +17,7 @@ ADS8332::ADS8332(uint8_t _SelectPin, uint8_t _ConvertPin, uint8_t _EOCPin) {
 }
 
 void ADS8332::setCommandBuffer(CommandRegister Command) {
-	CommandBuffer =            static_cast<uint16_t>(Command) << 12;
+	CommandBuffer = static_cast<uint16_t>(Command) << 12;
 }
 
 void ADS8332::begin() {
@@ -31,12 +32,31 @@ void ADS8332::begin() {
 	setConfiguration(ConfigRegisterMap::AutoNap, true);
 	setConfiguration(ConfigRegisterMap::Nap, true);
 	setConfiguration(ConfigRegisterMap::Sleep, true);
-	setConfiguration(ConfigRegisterMap::TAG, true);
+	setConfiguration(ConfigRegisterMap::TAG, false);
 	setConfiguration(ConfigRegisterMap::Reset, true);
-	Serial.println("ADC Configuration: ");
+	Serial.println("ADC Manual Config: ");
 	Serial.println(CommandBuffer,BIN);
 	sendCommandBuffer16();
 }
+void ADS8332::beginauto() {
+	setCommandBuffer(CommandRegister::WriteConfig);
+	setConfiguration(ConfigRegisterMap::ChannelSelectMode, true);
+	setConfiguration(ConfigRegisterMap::ClockSource, true);
+	setConfiguration(ConfigRegisterMap::TriggerMode, false);
+	setConfiguration(ConfigRegisterMap::SampleRate, true);
+	setConfiguration(ConfigRegisterMap::EOCINTPolarity, true);
+	setConfiguration(ConfigRegisterMap::EOCINTMode, true);
+	setConfiguration(ConfigRegisterMap::ChainMode, true);
+	setConfiguration(ConfigRegisterMap::AutoNap, true);
+	setConfiguration(ConfigRegisterMap::Nap, true);
+	setConfiguration(ConfigRegisterMap::Sleep, true);
+	setConfiguration(ConfigRegisterMap::TAG, true);
+	setConfiguration(ConfigRegisterMap::Reset, true);
+	Serial.println("ADC Auto Mode Config: ");
+	Serial.println(CommandBuffer,BIN);
+	sendCommandBuffer16();
+}
+
 
 void ADS8332::reset() {
 	setCommandBuffer(CommandRegister::WriteConfig);
@@ -105,44 +125,25 @@ uint8_t ADS8332::sendCommandBuffer8() {
 	return CommandReply8;
 }
 
+void ADS8332::sendCommandBuffer4() {
+	uint32_t xcmd=0,*cmd32=&xcmd;
+	*cmd32 = static_cast<uint32_t>(CommandBuffer4<<24);
+	REG_WRITE ( GPIO_OUT_W1TC_REG, 1<<SelectPin); //low
+	vspi->transferBits(0,cmd32, 4) ; 
+	REG_WRITE ( GPIO_OUT_W1TS_REG, 1<<SelectPin); //high
+}
+
 uint16_t ADS8332::getSample(uint8_t UseChannel) {
 	CommandBuffer=static_cast<uint16_t>(UseChannel) << 12;
-	/*
-	switch (UseChannel) {
-		case(0):
-			setCommandBuffer(CommandRegister::SelectCh0);
-			break;
-		case(1):
-			setCommandBuffer(CommandRegister::SelectCh1);
-			break;
-		case(2):
-			setCommandBuffer(CommandRegister::SelectCh2);
-			break;
-		case(3):
-			setCommandBuffer(CommandRegister::SelectCh3);
-			break;
-		case(4):
-			setCommandBuffer(CommandRegister::SelectCh4);
-			break;
-		case(5):
-			setCommandBuffer(CommandRegister::SelectCh5);
-			break;
-		case(6):
-			setCommandBuffer(CommandRegister::SelectCh6);
-			break;
-		case(7):
-			setCommandBuffer(CommandRegister::SelectCh7);
-			break;
-		default:
-			setCommandBuffer(CommandRegister::SelectCh0);
-			break;
-	}
-	*/
     sendCommandBuffer8();
+	//CommandBuffer4=UseChannel << 4;
+	//sendCommandBuffer4();
 	return getSampleInteger();
 }
 
-
+void delay_20ns() {
+    __asm__ __volatile__("nop\n nop\n nop\n nop\n nop\n");
+}
 uint16_t ADS8332::getSampleInteger() {
 	/*if (!beginsent)	{
 		begin();
@@ -150,8 +151,9 @@ uint16_t ADS8332::getSampleInteger() {
 	}*/
 	setCommandBuffer(CommandRegister::ReadData);
 	uint32_t starttime = micros();
-	bool keepwaiting = false;
+	
     gpio_set_level((gpio_num_t)ConvertPin,0); //digitalWrite(ConvertPin, LOW);
+	//delay_20ns();
 	/*
 	while(keepwaiting)	{
 		if (digitalRead(EOCPin) == 0)	{
@@ -165,18 +167,11 @@ uint16_t ADS8332::getSampleInteger() {
 		}
 	}*/
 	gpio_set_level((gpio_num_t)ConvertPin,1);  //digitalWrite(ConvertPin, HIGH);
-	keepwaiting = false;
+	//delay_20ns();	
 	starttime = micros();
 	//vspi->beginTransaction(ConnectionSettings);
-	while(keepwaiting) {
-		if (digitalRead(EOCPin) == 1){
-			keepwaiting = false;
-		}
-		else {
-			if ( (micros() - starttime) > EOCTimeout) {
-				return 0;
-			}
-		}
+	while(gpio_get_level((gpio_num_t)EOCPin) == 0) {
+		if ( (micros() - starttime) > EOCTimeout) return 0;
 	}
 	starttime = micros();
     REG_WRITE ( GPIO_OUT_W1TC_REG, 1<<SelectPin);  //digitalWrite(SelectPin,LOW);
@@ -184,7 +179,43 @@ uint16_t ADS8332::getSampleInteger() {
 	REG_WRITE ( GPIO_OUT_W1TS_REG, 1<<SelectPin);  //digitalWrite(SelectPin, HIGH);
 	//Serial.println("SampleReturn: "+String(SampleReturn));
 	//vspi->endTransaction();
-	return SampleReturn>>0;
+	return SampleReturn;
+}
+
+#include "esp32/rom/ets_sys.h"
+
+
+uint16_t ADS8332::getSampleIntegerAndTag(uint32_t *tag) {
+	setCommandBuffer(CommandRegister::ReadData);
+	uint32_t starttime = micros();
+    // gpio_set_level((gpio_num_t)ConvertPin,0); //digitalWrite(ConvertPin, LOW);
+	//delayMicroseconds(1);
+	
+	while(digitalRead(EOCPin) == 1)			if ( (micros() - starttime) > EOCTimeout) return 0;
+	
+	// gpio_set_level((gpio_num_t)ConvertPin,1);  //digitalWrite(ConvertPin, HIGH);
+	//vspi->beginTransaction(ConnectionSettings);
+	
+	
+    REG_WRITE ( GPIO_OUT_W1TC_REG, 1<<SelectPin); 
+	//digitalWrite(SelectPin,LOW);
+	//gpio_set_level((gpio_num_t)SelectPin,0);
+	//delay_20ns();
+	//SampleReturn32 = vspi->transfer32( (uint32_t)CommandBuffer<<16 );
+	SampleReturn = vspi->transfer16( CommandBuffer );
+	//*tag =(uint8_t) vspi->transfer( CommandBuffer );
+	 vspi->transferBits(0, tag, 3) ;
+	*tag= (*tag>>5);
+	REG_WRITE ( GPIO_OUT_W1TS_REG, 1<<SelectPin);  
+	//digitalWrite(SelectPin, HIGH);
+	//gpio_set_level((gpio_num_t)SelectPin,1);
+	//delay_20ns();
+	// *tag= (*tag & 0xE0000000) >> 29;
+	*tag=(SampleReturn32 >> 13) & 0x07;
+	//while(gpio_get_level((gpio_num_t)EOCPin) == 0) ;
+	//Serial.println("Tag: "+String(*tag)+" Val: "+String(SampleReturn));
+	//vspi->endTransaction();
+	return (SampleReturn32 >> 16) & 0xFFFF;;
 }
 
 SPISettings* ADS8332::GetSPISettings(){
